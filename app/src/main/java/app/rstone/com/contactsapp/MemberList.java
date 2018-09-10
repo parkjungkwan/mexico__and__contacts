@@ -1,10 +1,12 @@
 package app.rstone.com.contactsapp;
 
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.support.v7.app.AlertDialog;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
@@ -16,6 +18,7 @@ import android.widget.BaseAdapter;
 import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import java.util.*;
 import static app.rstone.com.contactsapp.Main.*;
@@ -46,6 +49,45 @@ public class MemberList extends AppCompatActivity {
                 intent.putExtra("seq",m.seq+"");
                 startActivity(intent);
             }
+        );
+
+        memberList.setOnItemLongClickListener(
+                (AdapterView<?> p, View v, int i, long l)->{
+                    Main.Member m = (Main.Member) memberList.getItemAtPosition(i);
+                    new AlertDialog.Builder(_this)
+                            .setTitle("DELETE")
+                            .setMessage("정말로 삭제할까요?")
+                            .setPositiveButton(
+                                    android.R.string.yes,
+                                    new DialogInterface.OnClickListener() {
+                                        @Override
+                                        public void onClick(DialogInterface dialog, int which) {
+                                            // 삭제 쿼리
+                                            Toast.makeText(_this,"삭제완료 !!",Toast.LENGTH_LONG).show();
+                                            startActivity(new Intent(_this,MemberList.class));
+                                        }
+                                    }
+                            )
+                            .setNegativeButton(
+                                    android.R.string.no,
+                                    new DialogInterface.OnClickListener() {
+                                        @Override
+                                        public void onClick(DialogInterface dialog, int which) {
+                                            Toast.makeText(_this,"삭제취소 !!",Toast.LENGTH_LONG).show();
+                                        }
+                                    }
+                            )
+                            .show()
+                    ;
+                    return true;
+                }
+
+        );
+        findViewById(R.id.addBtn).setOnClickListener(
+                (View v)->{
+                    startActivity(new Intent(_this, MemberAdd.class));
+                }
+
         );
 
     }
@@ -91,36 +133,18 @@ public class MemberList extends AppCompatActivity {
                 Log.d("등록된 회원이","없습니다.");
             }
             return list;
-       /*     return super
-                    .getDatabase()
-                    .rawQuery(String.format(
-                            " SELECT * FROM %s " +
-                                    " WHERE %s LIKE '%s' AND %s LIKE '%s' ",
-                            MEMTAB,
-                            MEMSEQ,
-                            id,
-                            MEMPW,
-                            pw
-                    ),null)
-                    .moveToNext()
-                    ;*/
         }
     }
     private class MemberAdapter extends BaseAdapter{
         ArrayList<Main.Member> list;
         LayoutInflater inflater;
+        Context _this;
 
         public MemberAdapter(Context _this,ArrayList<Main.Member> list) {
             this.list = list;
             this.inflater = LayoutInflater.from(_this);
+            this._this = _this;
         }
-        private int[] photos = {
-                R.drawable.profile_1,
-                R.drawable.profile_2,
-                R.drawable.profile_3,
-                R.drawable.profile_4,
-                R.drawable.profile_5
-        };
 
         @Override
         public int getCount() {
@@ -150,7 +174,23 @@ public class MemberList extends AppCompatActivity {
             }else{
                 holder = (ViewHolder)v.getTag();
             }
-            holder.profile.setImageResource(photos[i]);
+            ItemProfile query = new ItemProfile(_this);
+            query.seq = list.get(i).seq+"";
+            holder.profile
+                    .setImageDrawable(
+                    getResources().getDrawable(
+                            getResources().getIdentifier(
+                                    _this.getPackageName()+":drawable/"
+                                            + (new Main.RetrieveService() {
+                                        @Override
+                                        public Object perform() {
+                                            return query.execute();
+                                        }
+                                    }.perform())
+                                    , null, null
+                            ), _this.getTheme()
+                    )
+            );
             holder.name.setText(list.get(i).name);
             holder.phone.setText(list.get(i).phone);
             return v;
@@ -159,5 +199,36 @@ public class MemberList extends AppCompatActivity {
     static class ViewHolder{
         ImageView profile;
         TextView name,phone;
+    }
+    private class MemberProfileQuery extends QueryFactory{
+        SQLiteOpenHelper helper;
+        public MemberProfileQuery(Context _this) {
+            super(_this);
+            helper = new SQLiteHelper(_this);
+        }
+
+        @Override
+        public SQLiteDatabase getDatabase() {
+            return helper.getReadableDatabase();
+        }
+    }
+    private class ItemProfile extends MemberProfileQuery{
+        String seq;
+        public ItemProfile(Context _this) {
+            super(_this);
+        }
+        public String execute(){
+            Cursor c = getDatabase()
+                    .rawQuery(String.format(
+                            " SELECT %s FROM %s WHERE %s LIKE '%s' "
+                            , MEMPHOTO, MEMTAB, MEMSEQ, seq),null);
+            String result = "";
+            if(c != null){
+                if(c.moveToNext()){
+                    result = c.getString(c.getColumnIndex(MEMPHOTO));
+                }
+            }
+            return result;
+        }
     }
 }
